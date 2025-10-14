@@ -2,33 +2,11 @@
 import json
 import io
 import os
-import csv
-import threading
-from datetime import datetime
 import streamlit as st
-import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-# --- Config ---
-DATA_DIR = "shared_notes"
-LOG_FILE = "export_logs.csv"
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs("logs", exist_ok=True)
-log_lock = threading.Lock()
 
-# --- Safe log writing ---
-def write_log(user, filename, total_shirt, total_films):
-    log_path = os.path.join("logs", LOG_FILE)
-    with log_lock:
-        new_file = not os.path.exists(log_path)
-        with open(log_path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            if new_file:
-                writer.writerow(["user", "file_name", "total_shirt", "total_films", "timestamp"])
-            writer.writerow([user, filename, total_shirt, total_films, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
-
-# --- Excel export function ---
 def export_to_excel(data):
     wb = Workbook()
     ws = wb.active
@@ -37,6 +15,7 @@ def export_to_excel(data):
     thin = Side(border_style="thin", color="000000")
     border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
+    # --- Header top ---
     ws["A1"], ws["B1"], ws["C1"] = "FILE", "DATE", "TYPE"
     ws.merge_cells("A1:A2")
     ws.merge_cells("B1:B2")
@@ -46,6 +25,7 @@ def export_to_excel(data):
         ws[c].font = Font(bold=True)
         ws[c].border = border
 
+    # --- Column headers ---
     headers = ["ORDER ID", "ITEM", "F/B", "SHIRT TYPE", "QUANT.", "COLOR", "SIZE", "Approved", "Note"]
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=4, column=col, value=h)
@@ -54,7 +34,9 @@ def export_to_excel(data):
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
-    current_row = 5
+    start_row = 5
+    current_row = start_row
+
     orders = {}
     for item in data:
         order_id = item.get("order_external_id", "")
@@ -73,8 +55,9 @@ def export_to_excel(data):
             shirt_type = first.get("product_name", "").upper()
             color = first.get("product_color", "").strip()
             size = first.get("product_size", "").strip()
+            quant = "1"
 
-            row_vals = [order_id, item_count, fb_value, shirt_type, "1", color, size]
+            row_vals = [order_id, item_count, fb_value, shirt_type, quant, color, size]
             for col, val in enumerate(row_vals, 1):
                 cell = ws.cell(current_row, col, val)
                 cell.border = border
@@ -105,108 +88,48 @@ def export_to_excel(data):
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[chr(64 + i)].width = w
 
+    # Trả về file Excel trong memory
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
     return buffer, total_all_shirts, total_all_films
 
 
-# --- UI ---
-st.set_page_config(page_title="JSON ➜ Excel Tool (Multi-user + Admin)", layout="wide")
-st.title("🧾 JSON ➜ Excel Export Tool (4 người nhập + 1 quản lý)")
+# --- Streamlit App ---
+st.set_page_config(page_title="JSON ➜ Excel Export Tool", layout="wide")
 
-users = ["Tiên", "Hải", "Dung", "Sơn"]
-tabs = st.tabs(["👤 Tiên", "👤 Hải", "👤 Dung", "👤 Sơn", "🧑‍💼 Admin"])
+st.title("🧾 JSON ➜ Excel Export Tool (Multi-user Notepad)")
+st.write("Công cụ cho phép **4 người (Tiên, Hải, Dung, Sơn)** cùng nhập JSON và xuất ra Excel.")
 
-# --- User tabs ---
-for i, user in enumerate(users):
-    with tabs[i]:
-        st.subheader(f"📋 Notepad của {user}")
-        json_path = os.path.join(DATA_DIR, f"{user}.json")
+tabs = st.tabs(["Tiên", "Hải", "Dung", "Sơn"])
 
-        existing = ""
-        if os.path.exists(json_path):
-            with open(json_path, "r", encoding="utf-8") as f:
-                existing = f.read()
+for tab, user_name in zip(tabs, ["Tiên", "Hải", "Dung", "Sơn"]):
+    with tab:
+        st.subheader(f"👤 Notepad của {user_name}")
+        file_prefix = st.text_input(f"Tên file xuất Excel ({user_name}):", f"{user_name}_orders")
 
-        json_input = st.text_area(f"Dán JSON ({user}):", value=existing, height=250, key=f"input_{user}")
+        json_input = st.text_area(f"Dán JSON của {user_name} vào đây:", height=250, key=f"text_{user_name}")
 
-        if st.button(f"💾 Lưu JSON ({user})", key=f"save_{user}"):
-            text = json_input.strip()
-            if not text:
-                # Nếu trống → ghi [] để đánh dấu "đã xóa"
-                with open(json_path, "w", encoding="utf-8") as f:
-                    f.write("[]")
-                st.warning(f"⚠️ {user} đã xóa toàn bộ dữ liệu (file sẽ được ghi [] để tránh lỗi).")
+        if st.button(f"📤 Export Excel cho {user_name}", key=f"btn_{user_name}"):
+            if not json_input.strip():
+                st.warning("⚠️ Vui lòng dán dữ liệu JSON trước khi export.")
             else:
                 try:
-                    data = json.loads(text)
+                    data = json.loads(json_input)
                     if not isinstance(data, list):
-                        st.error("❌ JSON phải là list (danh sách) các object.")
+                        st.error("❌ JSON phải là danh sách (list) các object.")
                     else:
-                        with open(json_path, "w", encoding="utf-8") as f:
-                            json.dump(data, f, ensure_ascii=False, indent=2)
-                        st.success(f"✅ Đã lưu JSON cho {user} (file cũ bị ghi đè).")
+                        buffer, total_shirt, total_films = export_to_excel(data)
+                        filename = f"{file_prefix}_TOTAL_SHIRT_{total_shirt}_TOTAL_FILMS_{total_films}.xlsx"
+
+                        st.success(f"✅ Xuất thành công cho {user_name}!")
+                        st.download_button(
+                            label="⬇️ Tải Excel về",
+                            data=buffer,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
                 except json.JSONDecodeError as e:
                     st.error(f"❌ JSON không hợp lệ!\n{e}")
-
-
-# --- Admin tab ---
-with tabs[-1]:
-    st.subheader("🧑‍💼 Admin - Quản lý & Export")
-
-    # kiểm tra trạng thái từng người
-    status_list = []
-    available = []
-    for u in users:
-        path = os.path.join(DATA_DIR, f"{u}.json")
-        if not os.path.exists(path):
-            status_list.append(f"🔴 {u}: chưa có file JSON")
-        else:
-            try:
-                data = json.load(open(path, "r", encoding="utf-8"))
-                if isinstance(data, list) and len(data) > 0:
-                    status_list.append(f"🟢 {u}: có {len(data)} bản ghi")
-                    available.append(u)
-                else:
-                    status_list.append(f"🟡 {u}: file rỗng hoặc JSON không hợp lệ")
-            except Exception:
-                status_list.append(f"🔴 {u}: lỗi khi đọc JSON")
-
-    st.markdown("### 📊 Trạng thái người dùng:")
-    for s in status_list:
-        st.write(s)
-
-    selected_users = st.multiselect("Chọn người cần export:", available, default=available)
-
-    if st.button("📤 Export Excel"):
-        combined = []
-        for u in selected_users:
-            path = os.path.join(DATA_DIR, f"{u}.json")
-            with open(path, "r", encoding="utf-8") as f:
-                user_data = json.load(f)
-                if isinstance(user_data, list):
-                    combined.extend(user_data)
-
-        if not combined:
-            st.warning("⚠️ Không có dữ liệu hợp lệ để export.")
-        else:
-            buffer, total_shirt, total_films = export_to_excel(combined)
-            filename = "_".join(selected_users)
-            final_name = f"{filename}_TOTAL_SHIRT_{total_shirt}_TOTAL_FILMS_{total_films}.xlsx"
-            write_log("Admin", final_name, total_shirt, total_films)
-
-            st.success(f"✅ Xuất Excel thành công từ {', '.join(selected_users)}")
-            st.download_button(
-                "⬇️ Tải Excel",
-                data=buffer,
-                file_name=final_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-    log_path = os.path.join("logs", LOG_FILE)
-    if os.path.exists(log_path):
-        st.divider()
-        st.subheader("📜 Lịch sử xuất file")
-        df = pd.read_csv(log_path)
-        st.dataframe(df, use_container_width=True)
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi xuất file: {e}")
