@@ -3,6 +3,7 @@ import json
 import io
 import os
 import streamlit as st
+from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
@@ -46,6 +47,8 @@ def export_to_excel(data):
     total_all_films = 0
     total_all_shirts = 0
 
+    current_date = datetime.now().strftime("%Y-%m-%d")
+
     for order_id, groups in orders.items():
         for idx_item, group_items in sorted(groups.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else x[0]):
             item_count = len(group_items)
@@ -70,6 +73,7 @@ def export_to_excel(data):
             total_all_shirts += 1
             current_row += 1
 
+    # --- Footer tổng ---
     ws.cell(current_row, 1, "...")
     for c in range(1, 10):
         ws.cell(current_row, c).border = border
@@ -83,6 +87,11 @@ def export_to_excel(data):
     for c in range(1, 10):
         ws.cell(current_row, c).border = border
         ws.cell(current_row, c).alignment = Alignment(horizontal="center", vertical="center")
+
+    # --- Ghi ngày hiện tại lên đầu (ô B3 chẳng hạn) ---
+    ws["B3"] = current_date
+    ws["B3"].alignment = Alignment(horizontal="center")
+    ws["B3"].font = Font(italic=True, color="555555")
 
     widths = [18, 8, 18, 20, 10, 16, 12, 10, 24]
     for i, w in enumerate(widths, 1):
@@ -120,9 +129,9 @@ for tab, user_name in zip(tabs, ["Tiên", "Hải", "Dung", "Sơn"]):
                         st.error("❌ JSON phải là danh sách (list) các object.")
                     else:
                         buffer, total_shirt, total_films = export_to_excel(data)
-                        filename = f"{file_prefix}_TOTAL_SHIRT_{total_shirt}_TOTAL_FILMS_{total_films}.xlsx"
+                        filename = f"{file_prefix}_{datetime.now().strftime('%Y%m%d')}_TOTAL_SHIRT_{total_shirt}_TOTAL_FILMS_{total_films}.xlsx"
 
-                        st.success(f"✅ Xuất thành công cho {user_name}!")
+                        st.success(f"✅ Xuất thành công cho {user_name} ({datetime.now().strftime('%Y-%m-%d')})!")
                         st.download_button(
                             label="⬇️ Tải Excel về",
                             data=buffer,
