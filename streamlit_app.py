@@ -47,7 +47,7 @@ def export_to_excel(data):
     total_all_films = 0
     total_all_shirts = 0
 
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_date = datetime.now().strftime("%d-%m")
 
     for order_id, groups in orders.items():
         for idx_item, group_items in sorted(groups.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else x[0]):
@@ -88,10 +88,10 @@ def export_to_excel(data):
         ws.cell(current_row, c).border = border
         ws.cell(current_row, c).alignment = Alignment(horizontal="center", vertical="center")
 
-    # --- Ghi ngày hiện tại lên đầu (ô B3 chẳng hạn) ---
+    # --- Ghi ngày hiện tại (in đậm, không nghiêng) ---
     ws["B3"] = current_date
     ws["B3"].alignment = Alignment(horizontal="center")
-    ws["B3"].font = Font(italic=True, color="555555")
+    ws["B3"].font = Font(bold=True, color="000000")  # In đậm, không nghiêng
 
     widths = [18, 8, 18, 20, 10, 16, 12, 10, 24]
     for i, w in enumerate(widths, 1):
