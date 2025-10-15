@@ -27,7 +27,7 @@ def export_to_excel(data):
         ws[c].border = border
 
     # --- Column headers ---
-    headers = ["ORDER ID", "ITEM", "F/B", "SHIRT TYPE", "QUANT.", "COLOR", "SIZE", "Approved", "Note"]
+    headers = ["ORDER ID", "ITEM", "F/B", "SHIRT TYPE", "QUANT.", "COLOR", "SIZE"]
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=4, column=col, value=h)
         cell.fill = PatternFill(start_color="C9DAF8", end_color="C9DAF8", fill_type="solid")
@@ -49,6 +49,7 @@ def export_to_excel(data):
 
     current_date = datetime.now().strftime("%d-%m")
 
+    # --- Duyệt và ghi dữ liệu ---
     for order_id, groups in orders.items():
         for idx_item, group_items in sorted(groups.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else x[0]):
             item_count = len(group_items)
@@ -64,10 +65,11 @@ def export_to_excel(data):
             for col, val in enumerate(row_vals, 1):
                 cell = ws.cell(current_row, col, val)
                 cell.border = border
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-
-            ws.cell(current_row, 8, "").border = border
-            ws.cell(current_row, 9, "").border = border
+                # Cho ORDER ID tự xuống dòng, các cột khác thì canh giữa
+                if col == 1:
+                    cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                else:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
 
             total_all_films += item_count
             total_all_shirts += 1
@@ -75,7 +77,7 @@ def export_to_excel(data):
 
     # --- Footer tổng ---
     ws.cell(current_row, 1, "...")
-    for c in range(1, 10):
+    for c in range(1, len(headers) + 1):
         ws.cell(current_row, c).border = border
         ws.cell(current_row, c).alignment = Alignment(horizontal="center", vertical="center")
     current_row += 1
@@ -84,16 +86,17 @@ def export_to_excel(data):
     ws.cell(current_row, 2, total_all_films)
     ws.cell(current_row, 4, "TOTAL SHIRT")
     ws.cell(current_row, 5, total_all_shirts)
-    for c in range(1, 10):
+    for c in range(1, len(headers) + 1):
         ws.cell(current_row, c).border = border
         ws.cell(current_row, c).alignment = Alignment(horizontal="center", vertical="center")
 
     # --- Ghi ngày hiện tại (in đậm, không nghiêng) ---
     ws["B3"] = current_date
     ws["B3"].alignment = Alignment(horizontal="center")
-    ws["B3"].font = Font(bold=True, color="000000")  # In đậm, không nghiêng
+    ws["B3"].font = Font(bold=True, color="000000")
 
-    widths = [18, 8, 18, 20, 10, 16, 12, 10, 24]
+    # --- Căn chỉnh độ rộng cột ---
+    widths = [26, 8, 14, 20, 10, 16, 12]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[chr(64 + i)].width = w
 
@@ -129,9 +132,10 @@ for tab, user_name in zip(tabs, ["Tiên", "Hải", "Dung", "Sơn"]):
                         st.error("❌ JSON phải là danh sách (list) các object.")
                     else:
                         buffer, total_shirt, total_films = export_to_excel(data)
-                        filename = f"{file_prefix}_{datetime.now().strftime('%Y%m%d')}_TOTAL_SHIRT_{total_shirt}_TOTAL_FILMS_{total_films}.xlsx"
+                        current_date = datetime.now().strftime("%d-%m")
+                        filename = f"{file_prefix}_{current_date}_TOTAL_SHIRT_{total_shirt}_TOTAL_FILMS_{total_films}.xlsx"
 
-                        st.success(f"✅ Xuất thành công cho {user_name} ({datetime.now().strftime('%Y-%m-%d')})!")
+                        st.success(f"✅ Xuất thành công cho {user_name}! ({current_date})")
                         st.download_button(
                             label="⬇️ Tải Excel về",
                             data=buffer,
