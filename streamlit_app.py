@@ -133,7 +133,7 @@ for tab, user_name in zip(tabs, ["Tiên", "Hải", "Dung", "Sơn"]):
                     else:
                         buffer, total_shirt, total_films = export_to_excel(data)
                         current_date = datetime.now().strftime("%d-%m")
-                        filename = f"{file_prefix}_{current_date}_TOTAL_SHIRT_{total_shirt}_TOTAL_FILMS_{total_films}.xlsx"
+                        filename = f"{file_prefix}_{current_date}_SHIRT_{total_shirt}_FILMS_{total_films}.xlsx"
 
                         st.success(f"✅ Xuất thành công cho {user_name}! ({current_date})")
                         st.download_button(
